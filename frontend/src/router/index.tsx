@@ -8,6 +8,7 @@ import { LoginPage } from '../pages/LoginPage'
 import { AreasPage } from '../pages/AreasPage'
 import { PlansPage } from '../pages/PlansPage'
 import { RunsPage } from '../pages/RunsPage'
+import { ReplayPage } from '../pages/ReplayPage'
 import { CoveragePage } from '../pages/CoveragePage'
 import { AuditPage } from '../pages/AuditPage'
 
@@ -15,6 +16,6 @@ function Protected(){const user=useAuthStore(state=>state.user);const restore=us
 
 export const router=createBrowserRouter([
   {path:'/login',element:<LoginPage/>},
-  {path:'/',element:<Protected/>,children:[{index:true,element:<Navigate to="/areas" replace/>},{path:'areas',element:<AreasPage/>},{path:'plans',element:<PlansPage/>},{path:'runs',element:<RunsPage/>},{path:'coverage',element:<CoveragePage/>},{path:'audit',element:<AuditPage/>}]},
+  {path:'/',element:<Protected/>,children:[{index:true,element:<Navigate to="/areas" replace/>},{path:'areas',element:<AreasPage/>},{path:'plans',element:<PlansPage/>},{path:'runs',element:<RunsPage/>},{path:'replay',element:<ReplayPage/>},{path:'coverage',element:<CoveragePage/>},{path:'audit',element:<AuditPage/>}]},
   {path:'*',element:<Navigate to="/" replace/>}
 ])

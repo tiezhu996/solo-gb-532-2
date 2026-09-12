@@ -11,6 +11,7 @@ docker compose up -d --build
 - 测区：创建、校验米制投影边界，查看规划、运行和覆盖摘要。
 - 测线：从测区生成平行测线，锁定执行版本，复制形成后续草稿。
 - 航迹：导入 GeoJSON，检查采样点、长度、航速与导航质量，按状态机处理。
+- 回放：对已处理运行按采样序号回放轨迹、扫幅与质量标记，汇总丢点、重复覆盖和精度异常，冻结输入哈希、算法版本与快照。
 - 覆盖：以固定网格估算覆盖、重复覆盖和漏测，冻结输入哈希并生成补测线建议。
 - 审计：记录四类实体写操作的前后快照、操作者、角色、request ID 和算法元数据。
 
@@ -35,6 +36,7 @@ docker compose up -d --build
 | `/areas` | SurveyArea、TransectPlan | 创建投影测区、查看覆盖摘要和边界 |
 | `/plans` | TransectPlan、SurveyArea | 生成平行测线、锁定或复制版本 |
 | `/runs` | SonarRun、TransectPlan | 导入航迹、读取质量证据、推进处理状态 |
+| `/replay` | RunReplay、SonarRun | 生成回放快照，按采样序号播放、暂停、跳转，查看丢点/重叠/精度汇总 |
 | `/coverage` | CoverageGap、SonarRun、SurveyArea | 计算覆盖、查看缺口与补测线、人工复核 |
 | `/audit` | 四实体审计投影 | 按 request ID、实体和操作者筛选 |
 
@@ -91,6 +93,8 @@ database/init.sql        PostGIS 扩展初始化
 | GET | `/coverage-gaps`、`/coverage-gaps/:id` | 缺口快照列表与详情 |
 | POST | `/coverage-gaps/detect` | 覆盖计算，要求 `Idempotency-Key` |
 | POST | `/coverage-gaps/:id/transition` | reviewer 人工复核 |
+| GET | `/replays`、`/replays/:id` | 回放快照列表与冻结帧详情 |
+| POST | `/replays` | 为已处理运行生成回放快照，重复输入返回 409 |
 | GET | `/audits` | 审计筛选 |
 
 错误响应统一包含业务 `code`、`message`、可选 `details` 和 `request_id`。无效 GeoJSON/坐标系返回 422，非法状态或版本冲突返回 409，认证与权限分别返回 401/403。
@@ -106,6 +110,13 @@ database/init.sql        PostGIS 扩展初始化
 
 - 后端：`internal/constants/gap_severity.go`；`model/coverage_gap.go`；`dto/coverage_gap.go`；`service/coverage_gap.go`；`handler/coverage_gap.go`；`constants/state_test.go`。
 - 前端：`types/enums/gap-severity.ts`；`types/coverage-gap.ts`；`stores/coverage-gap-store.ts`；`pages/CoveragePage.tsx`；`utils/state.test.ts`。
+
+`ReplayFlag = dropout | overlap | accuracy`（回放质量标记）
+
+- 后端：`internal/constants/replay.go`；`geometry/replay.go` 回放算法；`model/run_replay.go`；`dto/run_replay.go`；`repository/run_replay.go`；`service/run_replay.go`；`handler/run_replay.go`；`geometry/replay_test.go`、`service/run_replay_test.go`。
+- 前端：`types/run-replay.ts`；`api/run-replay.ts`；`stores/replay-store.ts`；`components/common/ReplayCanvas.tsx`；`pages/ReplayPage.tsx`；`utils/replay.ts`、`utils/replay.test.ts`。
+
+回放算法（`replay-v1`）：丢点按相邻采样间距超过 2.5× 间距中位数判定并估算缺失数；重复覆盖以目标分辨率网格栅格化扫幅，同一网格被间隔超过 3 个采样的两批采样覆盖计一次；精度异常为导航质量基准误差叠加航迹局部抖动超过 10 米。回放结果把运行来源校验和、算法版本与全部参数做 SHA-256 输入哈希并冻结帧快照，相同输入的重复回放返回 409 且不改动运行数据。
 
 ## 坐标与算法边界
 
@@ -181,7 +192,10 @@ docker compose down -v --remove-orphans
 - `COORDINATE_SYSTEM_INVALID`：把经纬度转换为项目约定的米制投影坐标后重新创建测区。
 - `VERSION_CONFLICT`：数据已被其他人员更新，刷新列表后按新版本重试。
 - `RUN_TRANSITION_INVALID`：必须依次完成质量检查、处理和已处理状态。
-- `RUN_NOT_PROCESSED`：覆盖计算只能选择已处理且属于同一测区的运行。
+- `RUN_NOT_PROCESSED`：覆盖计算与质量回放只能选择已处理且属于同一测区的运行。
+- `REPLAY_DUPLICATE`：相同运行、算法版本与参数的回放快照已存在，调整参数后再生成。
+- `REPLAY_SAMPLE_MISSING`：请求或航迹声明的采样数与实际采样不一致，核对采集导出。
+- `REPLAY_COORDINATE_OUT_OF_BOUNDS`：航迹采样超出测区边界，检查坐标系或重新导入。
 - npm 默认镜像无法下载或审计：显式使用 `--registry=https://registry.npmjs.org --replace-registry-host=always`。
 
 ## License

@@ -20,6 +20,7 @@ type Handlers struct {
 	Plan     *handler.TransectPlanHandler
 	Run      *handler.SonarRunHandler
 	Coverage *handler.CoverageGapHandler
+	Replay   *handler.RunReplayHandler
 	Audit    *handler.AuditHandler
 }
 
@@ -33,6 +34,7 @@ func New(log *slog.Logger, auth *service.AuthService, handlers Handlers) *gin.En
 	loginLimit := middleware.NewRateLimiter(12, time.Minute)
 	importLimit := middleware.NewRateLimiter(20, time.Minute)
 	coverageLimit := middleware.NewRateLimiter(10, time.Minute)
+	replayLimit := middleware.NewRateLimiter(10, time.Minute)
 	apiV1 := engine.Group("/api/v1")
 	apiV1.POST("/auth/login", loginLimit.Middleware("login"), handlers.Auth.Login)
 
@@ -63,6 +65,10 @@ func New(log *slog.Logger, auth *service.AuthService, handlers Handlers) *gin.En
 	protected.GET("/coverage-gaps/:id", handlers.Coverage.Get)
 	protected.POST("/coverage-gaps/detect", coverageLimit.Middleware("coverage-detect"), middleware.RBAC(constants.RoleAdmin, constants.RoleDataProcessor), handlers.Coverage.Detect)
 	protected.POST("/coverage-gaps/:id/transition", middleware.RBAC(constants.RoleReviewer), handlers.Coverage.Transition)
+
+	protected.GET("/replays", handlers.Replay.List)
+	protected.GET("/replays/:id", handlers.Replay.Get)
+	protected.POST("/replays", replayLimit.Middleware("replay-create"), middleware.RBAC(constants.RoleAdmin, constants.RoleDataProcessor), handlers.Replay.Create)
 
 	protected.GET("/audits", middleware.RBAC(constants.RoleAdmin, constants.RoleReviewer, constants.RoleAuditor), handlers.Audit.List)
 	return engine

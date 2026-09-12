@@ -70,7 +70,7 @@ func OpenDatabase(config Config) (*gorm.DB, error) {
 		return nil, fmt.Errorf("open %s database: %w", config.DBDriver, err)
 	}
 	if config.AutoMigrate {
-		if err := db.AutoMigrate(&model.User{}, &model.SurveyArea{}, &model.TransectPlan{}, &model.SonarRun{}, &model.CoverageGap{}, &model.AuditEvent{}); err != nil {
+		if err := db.AutoMigrate(&model.User{}, &model.SurveyArea{}, &model.TransectPlan{}, &model.SonarRun{}, &model.CoverageGap{}, &model.RunReplay{}, &model.AuditEvent{}); err != nil {
 			return nil, fmt.Errorf("migrate database: %w", err)
 		}
 	}
